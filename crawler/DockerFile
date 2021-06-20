@@ -1,0 +1,2 @@
+FROM arm32v7/python
+RUN pip install pymysql && python write.py
