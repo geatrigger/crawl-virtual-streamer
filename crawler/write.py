@@ -11,5 +11,3 @@ conn.commit()
 conn.close()
 with open('./hi.txt', 'w', encoding='utf-8') as f:
     f.write('where are you slave..\n')
-while True:
-    pass
