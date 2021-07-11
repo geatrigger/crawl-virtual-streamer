@@ -1,0 +1,46 @@
+version: "3"
+services:
+  mysql:
+    image: "mysql:5"
+    container_name: mysql
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=testdb
+    networks:
+      - mysql-crawler
+  mongo:
+    image: "mongo"
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=virtual_streamer_gall
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    networks:
+      - mongo-crawler
+  crawler:
+    build: ./crawler
+    container_name: crawler
+    volumes:
+      - C:\crawl-virtual-streamer\crawler:/script
+    networks:
+      - mysql-crawler
+      - mongo-crawler
+    entrypoint: ./wait-for-it.sh mongo:27017 --timeout=15 -- python crawl.py
+    # entrypoint: python crawl.py
+
+networks:
+  mysql-crawler:
+  mongo-crawler:
+
+volumes:
+  mysql-data:
+    external: true
+  mongo-data:
