@@ -42,5 +42,4 @@ networks:
 
 volumes:
   mysql-data:
-    external: true
   mongo-data:
