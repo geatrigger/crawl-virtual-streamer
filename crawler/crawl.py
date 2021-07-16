@@ -128,14 +128,15 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
 # conn.close()
 # with open('./hi.txt', 'w', encoding='utf-8') as f:
 #     f.write('where are you slave..\n')
-client = MongoClient('mongo', 27017, username='root', password='password')
+# client = MongoClient('mongo', 27017, username='root', password='password', authSource='virtual_streamer_gall')
+client = MongoClient('mongo', 27017)
 # client['virtual_streamer_gall']['test'].insert_one({
 #   'name': 'kim',
 #   'age': 10
 # })
 print('hello print test')
 with open('./hi.txt', 'w', encoding='utf-8') as f:
-  f.write(str(client.list_database_names()))
+  f.write(str(client['virtual_streamer_gall']['test']))
 
 path = './test_test/'
 if not os.path.exists(path):

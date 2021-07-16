@@ -1,4 +1,5 @@
-FROM python:3
+# FROM python:3
+FROM arm32v7/python:3
 RUN mkdir /script
 # ADD crawl.py /script
 # ADD wait-for-it.sh /script

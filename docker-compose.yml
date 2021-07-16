@@ -1,7 +1,8 @@
 version: "3"
 services:
   mysql:
-    image: "mysql:5"
+    # image: "mysql:5"
+    image: "biarms/mysql:5.5.62-linux-arm32v7"
     container_name: mysql
     ports:
       - "3307:3306"
@@ -13,26 +14,33 @@ services:
     networks:
       - mysql-crawler
   mongo:
-    image: "mongo"
+    # image: "mongo"
+    image: "webhippie/mongodb:latest-arm32v7"
     container_name: mongo
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
-    environment:
-      - MONGO_INITDB_DATABASE=virtual_streamer_gall
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=password
+      - mongo-data:/var/lib/mongodb
+    # environment:
+      # - MONGO_INITDB_DATABASE=virtual_streamer_gall
+      # - MONGO_INITDB_ROOT_USERNAME=root
+      # - MONGO_INITDB_ROOT_PASSWORD=password
+      # - MONGODB_AUTH=true
+      # - MONGODB_DATABASE=virtual_streamer_gall
+      # - MONGODB_ROOT_USERNAME=root
+      # - MONGODB_ROOT_PASSWORD=password
     networks:
       - mongo-crawler
   crawler:
     build: ./crawler
     container_name: crawler
     volumes:
-      - C:\crawl-virtual-streamer\crawler:/script
+      # - C:\crawl-virtual-streamer\crawler:/script
+      - /home/pi/crawl-virtual-streamer/crawler:/script
     networks:
       - mysql-crawler
       - mongo-crawler
+    working_dir: /script
     entrypoint: ./wait-for-it.sh mongo:27017 --timeout=15 -- python crawl.py
     # entrypoint: python crawl.py
 
