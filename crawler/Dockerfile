@@ -6,3 +6,6 @@ WORKDIR /script
 RUN apt-get update
 RUN pip install pymysql
 RUN pip install pymongo
+RUN pip install requests
+RUN pip install bs4
+RUN pip install lxml
