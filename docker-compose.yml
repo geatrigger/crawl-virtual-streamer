@@ -42,7 +42,19 @@ services:
       - mongo-crawler
     working_dir: /script
     entrypoint: ./wait-for-it.sh mongo:27017 --timeout=15 -- python crawl.py
-    # entrypoint: python crawl.py
+  analysis:
+    build: ./analysis
+    container_name: analysis
+    ports:
+      - "8888:8888"
+    volumes:
+      - /home/pi/crawl-virtual-streamer/analysis:/jovyan/work
+    networks:
+      - mysql-crawler
+      - mongo-crawler
+    entrypoint: jupyter-notebook --ip="*" --no-browser --allow-root
+    expose:
+      - "8888"
 
 networks:
   mysql-crawler:

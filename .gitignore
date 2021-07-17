@@ -1,3 +1,5 @@
 *.env
 crawler/hi.txt
 crawler/crawl_info.txt
+crawler/error.txt
+analysis/*.ipynb
