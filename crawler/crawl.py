@@ -88,7 +88,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     gall_nums = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_num')
     head_texts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_subject')
     titles = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word > a:nth-child(1)')
-    comment_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word > a.reply_numbox > span')
+    comment_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word')
     writers = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_writer.ub-writer')
     gall_dates = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_date')
     view_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_count')
@@ -101,7 +101,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     json_file['gall_nums'] = [int(gall_num.get_text()) for gall_num in gall_nums] if gall_nums else None
     json_file['head_texts'] = [re_text.sub('', head_text.get_text()) for head_text in head_texts] if head_texts else None
     json_file['titles'] = [title.get_text() for title in titles] if titles else None
-    json_file['comment_cnts'] = [re_text.sub('', comment_cnt.get_text()) for comment_cnt in comment_cnts] if comment_cnts else None
+    json_file['comment_cnts'] = [re_text.sub('', comment_cnt.select_one('a.reply_numbox').get_text()) if comment_cnt.select_one('a.reply_numbox') else '0' for comment_cnt in comment_cnts] if comment_cnts else None
     json_file['writers'] = list(zip([writer['data-nick'] for writer in writers], [writer['data-uid'] for writer in writers], [writer['data-ip'] for writer in writers])) if writers else None
     json_file['gall_dates'] = [gall_date['title'] for gall_date in gall_dates] if gall_dates else None
     json_file['view_cnts'] = [view_cnt.get_text() for view_cnt in view_cnts] if view_cnts else None
@@ -158,37 +158,46 @@ with open('./crawl_info.txt', 'r', encoding='utf-8') as f:
   board_cnt = int(f.readline())
   end_gall_num = int(f.readline())
 try:
+  board_gall_nums = []
+  board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in client['virtual_streamer_gall']['board'].find({'board_cnt': board_cnt})]
+  for ith_gall_nums in board_gall_nums_arr:
+    board_gall_nums += list(map(int, ith_gall_nums))
+  post_gall_nums = list(map(int, client['virtual_streamer_gall']['post'].distinct('gall_num')))
+  gall_nums = list(set(board_gall_nums) - set(post_gall_nums))
   while True:
     work_start = time.time()
-    board_cnt += 1
-    is_enough = False
-    gall_nums = []
-    for i in range(1, page_cnt):
-      params = {
-        'id': 'virtual_streamer',
-        'list_num': '100',
-        'sort_type': 'N',
-        'page': i
-      }
-      html, crawl_time, status_code = crawl(base_url, params, 'get')
-      if html:
-        gall_nums_part = save_to_db(html, crawl_time, 'board', board_cnt, path)
-        time.sleep(2)
-      else:
-        with open('./' + 'boarderror' + '.txt', 'a', encoding='utf-8') as f:
-          f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
-          f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
-          f.write('not 200 at ith page: ' + str(i) + '\n')
-          f.write('not 200 at status_code: ' + str(status_code) + '\n')
-        continue
-      gall_nums += gall_nums_part
-      if end_gall_num >= min(gall_nums):
-        is_enough = True
-        break
-    if not is_enough:
-      continue
+    # crawl_info.txt must have complete crawling board_cnt
+    # if not complete crawling posts at board_cnt, resume
+    if not gall_nums:
+      board_cnt += 1
+      for i in range(1, page_cnt):
+        params = {
+          'id': 'virtual_streamer',
+          'list_num': '100',
+          'sort_type': 'N',
+          'page': i
+        }
+        html, crawl_time, status_code = crawl(base_url, params, 'get')
+        if html:
+          gall_nums_part = save_to_db(html, crawl_time, 'board', board_cnt, path)
+          time.sleep(2)
+        else:
+          with open('./' + 'boarderror' + '.txt', 'a', encoding='utf-8') as f:
+            f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\n')
+            f.write('not 200 at status_code: ' + str(status_code) + '\n')
+            f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
+            f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
+            f.write('not 200 at ith page: ' + str(i) + '\n')
+          continue
+        gall_nums += gall_nums_part
+        if end_gall_num >= min(gall_nums):
+          break
     # mongo에서 end_gall_num값보다 더 큰 gall_num값들만 가져옴
     # 해당 값이 나오면 스킵
+    with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
+      f.write(str(board_cnt) + '\n')
+      f.write(str(end_gall_num) + '\n')
+    gall_nums = sorted(list(set(gall_nums)), reverse=True)
     for gall_num in gall_nums:
       if gall_num <= end_gall_num:
         continue
@@ -202,6 +211,7 @@ try:
         time.sleep(2)
       else:
         with open('./' + str(gall_num) + '.txt', 'w', encoding='utf-8') as f:
+          f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\n')
           f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
           f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
           f.write('not 200 at gall_num: ' + str(gall_num) + '\n')
@@ -211,12 +221,15 @@ try:
     with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
       f.write(str(board_cnt) + '\n')
       f.write(str(end_gall_num) + '\n')
+    gall_nums = []
     work_end = time.time()
     while work_end - work_start < 30:
       work_end = time.time()
     end = time.time()
-except:
+except Exception as e:
   with open('./error.txt', 'w', encoding='utf-8') as f:
+    f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\n')
+    f.write('error name is: ' + str(e) + '\n')
     f.write('error at board_cnt: ' + str(board_cnt) + '\n')
     f.write('error at end_gall_num: ' + str(end_gall_num) + '\n')
     f.write('error at gall_num: ' + str(gall_num) + '\n')
