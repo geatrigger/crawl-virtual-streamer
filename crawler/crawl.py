@@ -73,7 +73,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     json_file['gall_date'] = gall_date['title']
     json_file['content'] = content.get_text("\n", strip=True)
     json_file['embed_links'] = [embed_link['src'] for embed_link in embed_links] if embed_links else None
-    json_file['img_links'] = [re_image.search(img_link['src']).group() if re_image.search(img_link['src']) else '' for img_link in img_links] if img_links else None
+    json_file['img_links'] = [img_link['src'] for img_link in img_links] if img_links else None
     json_file['view_cnt'] = view_cnt.get_text() if view_cnt else None
     json_file['comment_cnt'] = comment_cnt.get_text() if comment_cnt else None
     json_file['up_cnt'] = up_cnt.get_text() if up_cnt else None
@@ -217,13 +217,13 @@ try:
           f.write('not 200 at gall_num: ' + str(gall_num) + '\n')
           f.write('not 200 at status_code: ' + str(status_code) + '\n')
 
-    end_gall_num = max(gall_nums)
+    end_gall_num = max([int(ith_post['gall_num']) for ith_post in client['virtual_streamer_gall']['post'].find({}, {'_id': 0, 'gall_num': 1})])
     with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
       f.write(str(board_cnt) + '\n')
       f.write(str(end_gall_num) + '\n')
     gall_nums = []
     work_end = time.time()
-    while work_end - work_start < 30:
+    while work_end - work_start < 120:
       work_end = time.time()
     end = time.time()
 except Exception as e:
