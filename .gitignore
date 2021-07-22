@@ -1,0 +1,8 @@
+*.env
+crawler/hi.txt
+crawler/crawl_info.txt
+crawler/error.txt
+crawler/*.txt
+crawler/errors/
+analysis/*.ipynb
+analysis/*.json
