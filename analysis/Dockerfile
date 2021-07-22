@@ -7,3 +7,5 @@ RUN pip install requests
 RUN pip install bs4
 RUN pip install pandas
 RUN pip install plotly
+RUN pip install tqdm
+RUN pip install matplotlib
