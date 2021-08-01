@@ -6,3 +6,6 @@ crawler/*.txt
 crawler/errors/
 analysis/*.ipynb
 analysis/*.json
+analysis/.ipynb_checkpoints/
+analysis/BusVisualization/
+analysis/slack_token.txt

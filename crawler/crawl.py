@@ -12,6 +12,11 @@ from threading import Timer
 import re
 from datetime import datetime
 
+# slack bot(leave error log)
+with open('./slack_token.txt', 'r') as f:
+    SLACK_BOT_TOKEN = f.readline().strip()
+    SLACK_BOT_LINK = f.readline().strip()
+
 re_image = re.compile('[a-zA-Z0-9:/?=.]+(?=\')')
 re_text = re.compile('[^가-힣a-zA-Z0-9.]')
 re_manager = re.compile('[(](\S+)[)]')
@@ -23,6 +28,20 @@ retries = Retry(total=5,
 headers= {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0'
 }
+
+def post_message(channel, text):
+  headers = {
+    'Content-Type': 'application/json', 
+    'Authorization': 'Bearer ' + SLACK_BOT_TOKEN
+  }
+  payload = {
+    'channel': channel,
+    'text': text
+  }
+  r = requests.post(SLACK_BOT_LINK, 
+    headers=headers, 
+    data=json.dumps(payload)
+  )
 
 def crawl(base_url, params, how):
   if how == 'get':
@@ -134,13 +153,13 @@ client = MongoClient('mongo', 27017)
 #   'name': 'kim',
 #   'age': 10
 # })
-print('hello print test')
-with open('./hi.txt', 'w', encoding='utf-8') as f:
-  f.write(str(client['virtual_streamer_gall']['test']))
+# print('hello print test')
+# with open('./hi.txt', 'w', encoding='utf-8') as f:
+#   f.write(str(client['virtual_streamer_gall']['test']))
 
-path = './test_test/'
-if not os.path.exists(path):
-  os.makedirs('test_test')
+# path = './test_test/'
+# if not os.path.exists(path):
+#   os.makedirs('test_test')
 
 base_url = "https://gall.dcinside.com/mini/board/lists"
 view_url = 'https://gall.dcinside.com/mini/board/view/'
@@ -183,7 +202,7 @@ try:
           time.sleep(2)
         else:
           with open('./' + 'boarderror' + '.txt', 'a', encoding='utf-8') as f:
-            f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\n')
+            f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '(UTC)' + '\n')
             f.write('not 200 at status_code: ' + str(status_code) + '\n')
             f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
             f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
@@ -211,7 +230,7 @@ try:
         time.sleep(2)
       else:
         with open('./' + str(gall_num) + '.txt', 'w', encoding='utf-8') as f:
-          f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\n')
+          f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '(UTC)' + '\n')
           f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
           f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
           f.write('not 200 at gall_num: ' + str(gall_num) + '\n')
@@ -227,10 +246,12 @@ try:
       work_end = time.time()
     end = time.time()
 except Exception as e:
+  message = 'error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '(UTC)' + '\n' +\
+    'error name is: ' + str(e) + '\n' +\
+    'error at board_cnt: ' + str(board_cnt) + '\n' +\
+    'error at end_gall_num: ' + str(end_gall_num) + '\n' +\
+    'error at gall_num: ' + str(gall_num) + '\n' +\
+    'error at status_code: ' + str(status_code) + '\n'
   with open('./error.txt', 'w', encoding='utf-8') as f:
-    f.write('error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '\n')
-    f.write('error name is: ' + str(e) + '\n')
-    f.write('error at board_cnt: ' + str(board_cnt) + '\n')
-    f.write('error at end_gall_num: ' + str(end_gall_num) + '\n')
-    f.write('error at gall_num: ' + str(gall_num) + '\n')
-    f.write('error at status_code: ' + str(status_code) + '\n')
+    f.write(message)
+  post_message("#nt-crawl-virtual-streamer", message)
