@@ -74,7 +74,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     gall_date = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.gall_date')
     content = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap div.gallview_contents div.inner.clear div.writing_view_box div.write_div')
     embed_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div > div > embed')
-    img_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div p img')
+    img_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div img')
     view_cnt = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > div > div.fr > span.gall_count')
     comment_cnt = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > div > div.fr > span.gall_comment')
     up_cnt = soup.select_one('#recommend_view_up_' + str(gall_num))
@@ -134,7 +134,8 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     with open(path + 'comment.html', 'w', encoding='UTF-8') as f:
       f.write(html.decode('utf-8'))
     
-
+# start message
+post_message('#nt-crawl-virtual-streamer', 'start at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '(UTC)' + '\n')
 
 # conn = pymysql.connect(host='mysql', port=3306, user='root', passwd='bus', db='virtual_streamer_board')
 # cur = conn.cursor()
@@ -198,7 +199,7 @@ try:
         }
         html, crawl_time, status_code = crawl(base_url, params, 'get')
         if html:
-          gall_nums_part = save_to_db(html, crawl_time, 'board', board_cnt, path)
+          gall_nums_part = save_to_db(html, crawl_time, 'board', board_cnt)
           time.sleep(2)
         else:
           with open('./' + 'boarderror' + '.txt', 'a', encoding='utf-8') as f:
@@ -226,7 +227,7 @@ try:
       }
       html, crawl_time, status_code = crawl(view_url, params, 'get')
       if html:
-        save_to_db(html, crawl_time, 'post', None, path)
+        save_to_db(html, crawl_time, 'post', None)
         time.sleep(2)
       else:
         with open('./' + str(gall_num) + '.txt', 'w', encoding='utf-8') as f:
@@ -250,7 +251,7 @@ except Exception as e:
     'error name is: ' + str(e) + '\n' +\
     'error at board_cnt: ' + str(board_cnt) + '\n' +\
     'error at end_gall_num: ' + str(end_gall_num) + '\n' +\
-    'error at gall_num: ' + str(gall_num) + '\n' +\
+    'error at gall_num: ' + str(gall_num if gall_num else 'null') + '\n' +\
     'error at status_code: ' + str(status_code) + '\n'
   with open('./error.txt', 'w', encoding='utf-8') as f:
     f.write(message)
