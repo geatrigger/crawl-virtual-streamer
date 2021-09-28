@@ -64,6 +64,11 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
   start = time.time()
   soup = BeautifulSoup(html, 'lxml')
   if mode == 'post':
+    is_redirection_page = soup.select('html > body')
+    
+    if not is_redirection_page:
+      print(is_redirection_page, html, crawl_time)
+      return
     gall_num = soup.select_one('#no')['value']
     title = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content h3.title.ub-word span.title_subject')
     if not title:
