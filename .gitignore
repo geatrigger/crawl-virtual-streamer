@@ -9,3 +9,4 @@ analysis/*.json
 analysis/.ipynb_checkpoints/
 analysis/BusVisualization/
 analysis/slack_token.txt
+analysis/BoardLog/
