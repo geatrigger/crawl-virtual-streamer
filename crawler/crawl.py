@@ -72,6 +72,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     gall_num = soup.select_one('#no')['value']
     title = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content h3.title.ub-word span.title_subject')
     if not title:
+      print('no title', gall_num)
       return
     nickname = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.nickname')
     ip = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.ip')
@@ -86,6 +87,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     up_fix_cnt = soup.select_one('#recommend_view_up_fix_' + str(gall_num))
     down_cnt = soup.select_one('#recommend_view_down_' + str(gall_num))
     head_text = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > h3 > span.title_headtext')
+    movie_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div iframe')
 
     json_file = {}
     json_file['crawl_time'] = crawl_time
@@ -104,6 +106,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
     json_file['up_fix_cnt'] = up_fix_cnt.get_text() if up_fix_cnt else None
     json_file['down_cnt'] = down_cnt.get_text() if down_cnt else None
     json_file['head_text'] = re_text.sub('', head_text.get_text()) if head_text else None
+    json_file['movie_links'] = [movie_link['src'] for movie_link in movie_links] if movie_links else None
     client['virtual_streamer_gall']['post'].insert_one(json_file)
   elif mode == 'board':
     if not soup.select_one('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list'):
