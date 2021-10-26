@@ -248,7 +248,7 @@ try:
       f.write(str(end_gall_num) + '\n')
     gall_nums = []
     work_end = time.time()
-    while work_end - work_start < 120:
+    while work_end - work_start < 60:
       work_end = time.time()
     end = time.time()
 except Exception as e:
