@@ -11,6 +11,7 @@ from operator import itemgetter
 from threading import Timer
 import re
 from datetime import datetime
+import random
 
 # slack bot(leave error log)
 with open('./slack_token.txt', 'r') as f:
@@ -147,7 +148,7 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
       'error name is: ' + str(e) + '\n'
     post_message("#nt-crawl-virtual-streamer", error_message)
     with open('./error_html.html', 'w', encoding='utf-8') as f:
-      f.write(soup.get_text())
+      f.write(html.decode('utf-8'))
     message = 'error at board_cnt: ' + str(board_cnt) + '\n' +\
       'error at end_gall_num: ' + str(end_gall_num) + '\n' +\
       'error at gall_num: ' + str(gall_num if gall_num else 'null') + '\n' +\
@@ -248,7 +249,15 @@ try:
         'id': 'virtual_streamer',
         'no': gall_num,
       }
-      html, crawl_time, status_code = crawl(view_url, params, 'get')
+      retry_cnt = 0
+      while retry_cnt < 3:
+        html, crawl_time, status_code = crawl(view_url, params, 'get')
+        soup = BeautifulSoup(html, 'lxml')
+        if soup.select('#container'):
+          break
+        retry_cnt += 1
+        time.sleep(2)
+
       if html:
         save_to_db(html, crawl_time, 'post', None)
         time.sleep(2)
