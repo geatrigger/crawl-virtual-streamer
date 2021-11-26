@@ -252,9 +252,10 @@ try:
       retry_cnt = 0
       while retry_cnt < 3:
         html, crawl_time, status_code = crawl(view_url, params, 'get')
-        soup = BeautifulSoup(html, 'lxml')
-        if soup.select('#container'):
-          break
+        if status_code == 200:
+          soup = BeautifulSoup(html, 'lxml')
+          if soup.select('#container'):
+            break
         retry_cnt += 1
         time.sleep(2)
 
