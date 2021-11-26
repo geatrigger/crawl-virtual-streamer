@@ -63,84 +63,98 @@ def save_to_db(html, crawl_time, mode, board_cnt, file_name='./test_test/dummy')
   '''
   start = time.time()
   soup = BeautifulSoup(html, 'lxml')
-  if mode == 'post':
-    is_redirection_page = soup.select('html > body')
-    
-    if not is_redirection_page:
-      print(is_redirection_page, html, crawl_time)
-      return
-    gall_num = soup.select_one('#no')['value']
-    title = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content h3.title.ub-word span.title_subject')
-    if not title:
-      print('no title', gall_num)
-      return
-    nickname = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.nickname')
-    ip = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.ip')
-    uid = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer')
-    gall_date = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.gall_date')
-    content = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap div.gallview_contents div.inner.clear div.writing_view_box div.write_div')
-    embed_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div > div > embed')
-    img_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div img')
-    view_cnt = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > div > div.fr > span.gall_count')
-    comment_cnt = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > div > div.fr > span.gall_comment')
-    up_cnt = soup.select_one('#recommend_view_up_' + str(gall_num))
-    up_fix_cnt = soup.select_one('#recommend_view_up_fix_' + str(gall_num))
-    down_cnt = soup.select_one('#recommend_view_down_' + str(gall_num))
-    head_text = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > h3 > span.title_headtext')
-    movie_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div iframe')
+  try:
+    if mode == 'post':
+      is_redirection_page = soup.select('html > body')
+      
+      if not is_redirection_page:
+        print(is_redirection_page, html, crawl_time)
+        return
+      gall_num = soup.select_one('#no')['value']
+      title = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content h3.title.ub-word span.title_subject')
+      if not title:
+        print('no title', gall_num)
+        return
+      nickname = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.nickname')
+      ip = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.ip')
+      uid = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer')
+      gall_date = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap header div.gallview_head.clear.ub-content div.gall_writer.ub-writer div.fl span.gall_date')
+      content = soup.select_one('html.darkmode body div#top.dcwrap.width1160.view_wrap.miniwrap div.wrap_inner main#container.clear.mini_view section article div.view_content_wrap div.gallview_contents div.inner.clear div.writing_view_box div.write_div')
+      embed_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div > div > embed')
+      img_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div img')
+      view_cnt = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > div > div.fr > span.gall_count')
+      comment_cnt = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > div > div.fr > span.gall_comment')
+      up_cnt = soup.select_one('#recommend_view_up_' + str(gall_num))
+      up_fix_cnt = soup.select_one('#recommend_view_up_fix_' + str(gall_num))
+      down_cnt = soup.select_one('#recommend_view_down_' + str(gall_num))
+      head_text = soup.select_one('#container > section > article:nth-child(3) > div.view_content_wrap > header > div > h3 > span.title_headtext')
+      movie_links = soup.select('#container > section > article:nth-child(3) > div.view_content_wrap > div > div.inner.clear > div.writing_view_box > div.write_div iframe')
 
-    json_file = {}
-    json_file['crawl_time'] = crawl_time
-    json_file['gall_num'] = gall_num
-    json_file['title'] = title.get_text()
-    json_file['nickname'] = nickname.get_text()
-    json_file['uid'] = uid.attrs['data-uid'] if uid and uid != '' else None
-    json_file['ip'] = re_text.sub('', ip.get_text()) if ip else None
-    json_file['gall_date'] = gall_date['title']
-    json_file['content'] = content.get_text("\n", strip=True)
-    json_file['embed_links'] = [embed_link['src'] for embed_link in embed_links] if embed_links else None
-    json_file['img_links'] = [img_link['src'] for img_link in img_links] if img_links else None
-    json_file['view_cnt'] = view_cnt.get_text() if view_cnt else None
-    json_file['comment_cnt'] = comment_cnt.get_text() if comment_cnt else None
-    json_file['up_cnt'] = up_cnt.get_text() if up_cnt else None
-    json_file['up_fix_cnt'] = up_fix_cnt.get_text() if up_fix_cnt else None
-    json_file['down_cnt'] = down_cnt.get_text() if down_cnt else None
-    json_file['head_text'] = re_text.sub('', head_text.get_text()) if head_text else None
-    json_file['movie_links'] = [movie_link['src'] for movie_link in movie_links] if movie_links else None
-    client['virtual_streamer_gall']['post'].insert_one(json_file)
-  elif mode == 'board':
-    if not soup.select_one('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list'):
-      print(soup)
-      return
-    gall_nums = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_num')
-    head_texts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_subject')
-    titles = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word > a:nth-child(1)')
-    comment_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word')
-    writers = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_writer.ub-writer')
-    gall_dates = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_date')
-    view_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_count')
-    up_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_recommend')
-    manager = soup.select_one('#container > section.left_content > article:nth-child(2) > div > div > div.issue_contentbox.clear > div > div.info_contbox > div > div:nth-child(1) > p > span')
-    sub_managers = soup.select('#container > section.left_content > article:nth-child(2) > div > div > div.issue_contentbox.clear > div > div.info_contbox > div > div:nth-child(2) > p span[title]')
+      json_file = {}
+      json_file['crawl_time'] = crawl_time
+      json_file['gall_num'] = gall_num
+      json_file['title'] = title.get_text()
+      json_file['nickname'] = nickname.get_text()
+      json_file['uid'] = uid.attrs['data-uid'] if uid and uid != '' else None
+      json_file['ip'] = re_text.sub('', ip.get_text()) if ip else None
+      json_file['gall_date'] = gall_date['title']
+      json_file['content'] = content.get_text("\n", strip=True)
+      json_file['embed_links'] = [embed_link['src'] for embed_link in embed_links] if embed_links else None
+      json_file['img_links'] = [img_link['src'] for img_link in img_links] if img_links else None
+      json_file['view_cnt'] = view_cnt.get_text() if view_cnt else None
+      json_file['comment_cnt'] = comment_cnt.get_text() if comment_cnt else None
+      json_file['up_cnt'] = up_cnt.get_text() if up_cnt else None
+      json_file['up_fix_cnt'] = up_fix_cnt.get_text() if up_fix_cnt else None
+      json_file['down_cnt'] = down_cnt.get_text() if down_cnt else None
+      json_file['head_text'] = re_text.sub('', head_text.get_text()) if head_text else None
+      json_file['movie_links'] = [movie_link['src'] for movie_link in movie_links] if movie_links else None
+      client['virtual_streamer_gall']['post'].insert_one(json_file)
+    elif mode == 'board':
+      if not soup.select_one('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list'):
+        print(soup)
+        return
+      gall_nums = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_num')
+      head_texts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_subject')
+      titles = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word > a:nth-child(1)')
+      comment_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_tit.ub-word')
+      writers = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_writer.ub-writer')
+      gall_dates = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_date')
+      view_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_count')
+      up_cnts = soup.select('#container > section.left_content > article:nth-child(3) > div.gall_listwrap.list > table > tbody > tr:not([data-type="icon_notice"]).us-post > td.gall_recommend')
+      manager = soup.select_one('#container > section.left_content > article:nth-child(2) > div > div > div.issue_contentbox.clear > div > div.info_contbox > div > div:nth-child(1) > p > span')
+      sub_managers = soup.select('#container > section.left_content > article:nth-child(2) > div > div > div.issue_contentbox.clear > div > div.info_contbox > div > div:nth-child(2) > p span[title]')
 
-    json_file = {}
-    json_file['crawl_time'] = crawl_time
-    json_file['gall_nums'] = [int(gall_num.get_text()) for gall_num in gall_nums] if gall_nums else None
-    json_file['head_texts'] = [re_text.sub('', head_text.get_text()) for head_text in head_texts] if head_texts else None
-    json_file['titles'] = [title.get_text() for title in titles] if titles else None
-    json_file['comment_cnts'] = [re_text.sub('', comment_cnt.select_one('a.reply_numbox').get_text()) if comment_cnt.select_one('a.reply_numbox') else '0' for comment_cnt in comment_cnts] if comment_cnts else None
-    json_file['writers'] = list(zip([writer['data-nick'] for writer in writers], [writer['data-uid'] for writer in writers], [writer['data-ip'] for writer in writers])) if writers else None
-    json_file['gall_dates'] = [gall_date['title'] for gall_date in gall_dates] if gall_dates else None
-    json_file['view_cnts'] = [view_cnt.get_text() for view_cnt in view_cnts] if view_cnts else None
-    json_file['up_cnts'] = [up_cnt.get_text() for up_cnt in up_cnts] if up_cnts else None
-    json_file['manager'] = re_manager.search(manager.get_text()).group(1) if manager else None
-    json_file['sub_managers'] = [sub_manager['title'] for sub_manager in sub_managers] if sub_managers else None
-    json_file['board_cnt'] = board_cnt
-    client['virtual_streamer_gall']['board'].insert_one(json_file)
-    return json_file['gall_nums']
-  elif mode == 'comment':
-    with open(path + 'comment.html', 'w', encoding='UTF-8') as f:
-      f.write(html.decode('utf-8'))
+      json_file = {}
+      json_file['crawl_time'] = crawl_time
+      json_file['gall_nums'] = [int(gall_num.get_text()) for gall_num in gall_nums] if gall_nums else None
+      json_file['head_texts'] = [re_text.sub('', head_text.get_text()) for head_text in head_texts] if head_texts else None
+      json_file['titles'] = [title.get_text() for title in titles] if titles else None
+      json_file['comment_cnts'] = [re_text.sub('', comment_cnt.select_one('a.reply_numbox').get_text()) if comment_cnt.select_one('a.reply_numbox') else '0' for comment_cnt in comment_cnts] if comment_cnts else None
+      json_file['writers'] = list(zip([writer['data-nick'] for writer in writers], [writer['data-uid'] for writer in writers], [writer['data-ip'] for writer in writers])) if writers else None
+      json_file['gall_dates'] = [gall_date['title'] for gall_date in gall_dates] if gall_dates else None
+      json_file['view_cnts'] = [view_cnt.get_text() for view_cnt in view_cnts] if view_cnts else None
+      json_file['up_cnts'] = [up_cnt.get_text() for up_cnt in up_cnts] if up_cnts else None
+      json_file['manager'] = re_manager.search(manager.get_text()).group(1) if manager else None
+      json_file['sub_managers'] = [sub_manager['title'] for sub_manager in sub_managers] if sub_managers else None
+      json_file['board_cnt'] = board_cnt
+      client['virtual_streamer_gall']['board'].insert_one(json_file)
+      return json_file['gall_nums']
+    elif mode == 'comment':
+      with open(path + 'comment.html', 'w', encoding='UTF-8') as f:
+        f.write(html.decode('utf-8'))
+  except Exception as e:
+    error_message = 'error at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '(UTC)' + '\n' +\
+      'error name is: ' + str(e) + '\n'
+    post_message("#nt-crawl-virtual-streamer", error_message)
+    with open('./error_html.html', 'w', encoding='utf-8') as f:
+      f.write(soup.get_text())
+    message = 'error at board_cnt: ' + str(board_cnt) + '\n' +\
+      'error at end_gall_num: ' + str(end_gall_num) + '\n' +\
+      'error at gall_num: ' + str(gall_num if gall_num else 'null') + '\n' +\
+      'error at status_code: ' + str(status_code) + '\n'
+    with open('./save_to_db_error.txt', 'w', encoding='utf-8') as f:
+      f.write(error_message + message)
+    post_message("#nt-crawl-virtual-streamer", message)
     
 # start message
 post_message('#nt-crawl-virtual-streamer', 'start at: ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '(UTC)' + '\n')
@@ -226,6 +240,7 @@ try:
       f.write(str(board_cnt) + '\n')
       f.write(str(end_gall_num) + '\n')
     gall_nums = sorted(list(set(gall_nums)), reverse=True)
+    gall_num = None
     for gall_num in gall_nums:
       if gall_num <= end_gall_num:
         continue
