@@ -202,7 +202,8 @@ with open('./crawl_info.txt', 'r', encoding='utf-8') as f:
   end_gall_num = int(f.readline())
 try:
   board_gall_nums = []
-  board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in client['virtual_streamer_gall']['board'].find({'board_cnt': board_cnt})]
+  cur_board = client['virtual_streamer_gall']['board'].find({'board_cnt': board_cnt})
+  board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in cur_board if ith_board['gall_nums'] is not None]
   for ith_gall_nums in board_gall_nums_arr:
     board_gall_nums += list(map(int, ith_gall_nums))
   post_gall_nums = list(map(int, client['virtual_streamer_gall']['post'].distinct('gall_num')))
