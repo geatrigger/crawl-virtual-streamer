@@ -24,6 +24,7 @@ s.mount('http://', HTTPAdapter(max_retries=retries))
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0',
+    'X-Requested-With': 'XMLHttpRequest',
 }
 
 
@@ -31,7 +32,7 @@ def crawl(base_url, params, how):
     if how == 'get':
         res = s.get(base_url, headers=headers, params=params, timeout=15)
     elif how == 'post':
-        res = s.post(base_url, headers=headers, data=params, timeout=15)
+        res = s.post(base_url, headers=headers, params=params, timeout=15)
     else:
         raise ValueError('how must be get or post')
 
@@ -238,7 +239,7 @@ def log(msg):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
 
 try:
-    log(f'start crawler with board_cnt={board_cnt}, end_gall_num={end_gall_num}')
+    log(f'start crawler board_cnt={board_cnt}, end_gall_num={end_gall_num}')
     board_gall_nums = []
     board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in db['board'].find({'board_cnt': board_cnt})]
     for ith_gall_nums in board_gall_nums_arr:
@@ -252,7 +253,7 @@ try:
 
         if not gall_nums:
             board_cnt += 1
-            log(f'collect board list for board_cnt={board_cnt}')
+            log(f'collect board snapshot board_cnt={board_cnt}')
             for i in range(1, page_cnt):
                 params = {
                     'id': 'virtual_streamer',
@@ -281,25 +282,22 @@ try:
                 if end_gall_num >= min(gall_nums):
                     break
 
-        if db['post'].estimated_document_count() == 0 and gall_nums and max(gall_nums) <= end_gall_num:
-            log(
-                'post collection is empty and current board snapshot has no gall_num greater than '
-                f'end_gall_num({end_gall_num}). Keep end_gall_num and fetch next board snapshot.'
-            )
-            gall_nums = []
-            continue
-
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
             f.write(str(board_cnt) + '\n')
             f.write(str(end_gall_num) + '\n')
 
         gall_nums = sorted(list(set(gall_nums)), reverse=True)
+        log(f'candidate gall_nums={len(gall_nums)} max={max(gall_nums) if gall_nums else None} min={min(gall_nums) if gall_nums else None} end_gall_num={end_gall_num}')
 
         processed_posts = 0
         processed_comments = 0
+        skipped_by_end = 0
+        parse_post_failed = 0
+        view_non_200 = 0
 
         for gall_num in gall_nums:
             if gall_num <= end_gall_num:
+                skipped_by_end += 1
                 continue
 
             params = {
@@ -313,13 +311,20 @@ try:
                     db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
                     processed_posts += 1
 
-                    comment_doc, _, _ = fetch_comments(gall_num)
+                    comment_doc, _, comment_status = fetch_comments(gall_num)
                     if comment_doc is not None:
                         db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
                         processed_comments += 1
+                    else:
+                        log(f'comment parse failed gall_num={gall_num} status={comment_status}')
+                else:
+                    parse_post_failed += 1
+                    if parse_post_failed <= 3:
+                        log(f'post parse failed gall_num={gall_num} status={status_code} html_prefix={str(html[:200])}')
 
                 time.sleep(2)
             else:
+                view_non_200 += 1
                 with open('./' + str(gall_num) + '.txt', 'w', encoding='utf-8') as f:
                     f.write('error at: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
                     f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
@@ -328,8 +333,8 @@ try:
                     f.write('not 200 at status_code: ' + str(status_code) + '\n')
 
         log(
-            f'crawl cycle summary board_cnt={board_cnt}, candidate={len(gall_nums)}, '
-            f'posts_upserted={processed_posts}, comments_upserted={processed_comments}, end_gall_num={end_gall_num}'
+            f'cycle summary board_cnt={board_cnt} candidates={len(gall_nums)} skipped_by_end={skipped_by_end} '
+            f'view_non_200={view_non_200} parse_post_failed={parse_post_failed} posts_upserted={processed_posts} comments_upserted={processed_comments}'
         )
 
         end_gall_num = max([int(ith_post['gall_num']) for ith_post in db['post'].find({}, {'_id': 0, 'gall_num': 1})])
