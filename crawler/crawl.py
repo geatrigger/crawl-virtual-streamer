@@ -284,10 +284,11 @@ try:
 
         if db['post'].estimated_document_count() == 0 and gall_nums and max(gall_nums) <= end_gall_num:
             log(
-                'post collection is empty, but crawl_info end_gall_num blocks all known posts. '
-                'Automatically reset end_gall_num to 0 for initial bootstrap.'
+                'post collection is empty and current board snapshot has no gall_num greater than '
+                f'end_gall_num({end_gall_num}). Keep end_gall_num and fetch next board snapshot.'
             )
-            end_gall_num = 0
+            gall_nums = []
+            continue
 
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
             f.write(str(board_cnt) + '\n')
