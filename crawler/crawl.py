@@ -239,6 +239,9 @@ page_cnt = 100000
 board_cnt = -1
 end_gall_num = 10000000000
 board_stop_match_cnt = int(os.getenv('BOARD_STOP_MATCH_COUNT', '5'))
+post_retry_count = int(os.getenv('POST_RETRY_COUNT', '3'))
+comment_retry_count = int(os.getenv('COMMENT_RETRY_COUNT', '3'))
+retry_sleep_seconds = float(os.getenv('RETRY_SLEEP_SECONDS', '1'))
 
 if os.path.exists('./crawl_info.txt'):
     with open('./crawl_info.txt', 'r', encoding='utf-8') as f:
@@ -268,7 +271,7 @@ try:
         board_gall_nums += list(map(int, ith_gall_nums))
 
     post_gall_nums = list(map(int, db['post'].distinct('gall_num')))
-    gall_nums = list(set(board_gall_nums) - set(post_gall_nums))
+    gall_nums = [gall_num for gall_num in (set(board_gall_nums) - set(post_gall_nums)) if gall_num > end_gall_num]
 
     while True:
         work_start = time.time()
@@ -318,59 +321,97 @@ try:
         parse_post_failed = 0
         view_non_200 = 0
         abnormal_access = 0
+        progress_every = int(os.getenv('PROGRESS_LOG_EVERY', '200'))
+        to_process_cnt = sum(1 for gall_num in gall_nums if gall_num > end_gall_num)
 
-        for gall_num in gall_nums:
+        for idx, gall_num in enumerate(gall_nums, start=1):
+            if idx == 1:
+                log(f'begin processing total_candidates={len(gall_nums)} to_process={to_process_cnt}')
             if gall_num <= end_gall_num:
                 skipped_by_end += 1
                 continue
+
 
             params = {
                 'id': 'virtual_streamer',
                 'no': gall_num,
             }
-            html, crawl_time, status_code = crawl(view_url, params, 'get')
-            if html:
-                post_doc = parse_post(html, crawl_time)
-                if post_doc:
-                    db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
-                    processed_posts += 1
 
+            post_doc = None
+            last_html = None
+            last_status_code = None
+
+            for post_attempt in range(1, post_retry_count + 1):
+                html, crawl_time, status_code = crawl(view_url, params, 'get')
+                last_html = html
+                last_status_code = status_code
+
+                if html:
+                    post_doc = parse_post(html, crawl_time)
+                    if post_doc:
+                        break
+                if post_attempt < post_retry_count:
+                    time.sleep(retry_sleep_seconds)
+
+            if post_doc:
+                db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
+                processed_posts += 1
+
+                comment_doc = None
+                comment_status = None
+                for comment_attempt in range(1, comment_retry_count + 1):
                     comment_doc, _, comment_status = fetch_comments(gall_num, post_doc.get('e_s_n_o'))
                     if comment_doc is not None:
-                        db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
+                        break
+                    if comment_attempt < comment_retry_count:
+                        time.sleep(retry_sleep_seconds)
 
-                        history_doc = {
-                            'gall_num': comment_doc['gall_num'],
-                            'crawl_time': comment_doc['crawl_time'],
-                            'total_cnt': comment_doc['total_cnt'],
-                            'comments': comment_doc['comments'],
-                        }
-                        db['comment_history'].update_one(
-                            {'gall_num': history_doc['gall_num'], 'crawl_time': history_doc['crawl_time']},
-                            {'$setOnInsert': history_doc},
-                            upsert=True,
-                        )
+                if comment_doc is not None:
+                    db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
 
-                        processed_comments += 1
-                    else:
-                        log(f'comment parse failed gall_num={gall_num} status={comment_status}')
+                    history_doc = {
+                        'gall_num': comment_doc['gall_num'],
+                        'crawl_time': comment_doc['crawl_time'],
+                        'total_cnt': comment_doc['total_cnt'],
+                        'comments': comment_doc['comments'],
+                    }
+                    db['comment_history'].update_one(
+                        {'gall_num': history_doc['gall_num'], 'crawl_time': history_doc['crawl_time']},
+                        {'$setOnInsert': history_doc},
+                        upsert=True,
+                    )
+                    processed_comments += 1
+                else:
+                    log(f'comment fetch failed after retries gall_num={gall_num} retries={comment_retry_count} status={comment_status}')
+            else:
+                if last_html is None:
+                    view_non_200 += 1
+                    with open('./' + str(gall_num) + '.txt', 'w', encoding='utf-8') as f:
+                        f.write('error at: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
+                        f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
+                        f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
+                        f.write('not 200 at gall_num: ' + str(gall_num) + '\n')
+                        f.write('not 200 at status_code: ' + str(last_status_code) + '\n')
                 else:
                     parse_post_failed += 1
-                    if parse_post_failed <= 3:
-                        snippet = html_snippet(html)
+                    if parse_post_failed <= 10:
+                        snippet = html_snippet(last_html)
                         if snippet and '정상적인 접근이 아닙니다' in snippet:
                             abnormal_access += 1
-                        log(f'post parse failed gall_num={gall_num} status={status_code} html_prefix={snippet}')
+                        log(
+                            f'post parse failed after retries gall_num={gall_num} retries={post_retry_count} '
+                            f'status={last_status_code} html_prefix={snippet}'
+                        )
 
-                time.sleep(2)
-            else:
-                view_non_200 += 1
-                with open('./' + str(gall_num) + '.txt', 'w', encoding='utf-8') as f:
-                    f.write('error at: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
-                    f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
-                    f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
-                    f.write('not 200 at gall_num: ' + str(gall_num) + '\n')
-                    f.write('not 200 at status_code: ' + str(status_code) + '\n')
+            time.sleep(2)
+
+            if progress_every > 0 and idx % progress_every == 0:
+                elapsed = int(time.time() - work_start)
+                log(
+                    f'progress {idx}/{len(gall_nums)} elapsed={elapsed}s '
+                    f'posts_upserted={processed_posts} comments_upserted={processed_comments} '
+                    f'skipped_by_end={skipped_by_end} parse_post_failed={parse_post_failed} view_non_200={view_non_200}'
+                )
 
         log(
             f'cycle summary board_cnt={board_cnt} candidates={len(gall_nums)} skipped_by_end={skipped_by_end} '
