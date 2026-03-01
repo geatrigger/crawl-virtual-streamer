@@ -225,6 +225,7 @@ def ensure_indexes(db):
     db['post'].create_index('gall_num', unique=True)
     db['board'].create_index('board_cnt')
     db['comment'].create_index('gall_num', unique=True)
+    db['comment_history'].create_index([('gall_num', 1), ('crawl_time', 1)], unique=True)
 
 
 client = MongoClient(os.getenv('MONGO_HOST', 'mongo'), int(os.getenv('MONGO_PORT', '27017')))
@@ -237,6 +238,7 @@ view_url = 'https://gall.dcinside.com/mini/board/view/'
 page_cnt = 100000
 board_cnt = -1
 end_gall_num = 10000000000
+board_stop_match_cnt = int(os.getenv('BOARD_STOP_MATCH_COUNT', '5'))
 
 if os.path.exists('./crawl_info.txt'):
     with open('./crawl_info.txt', 'r', encoding='utf-8') as f:
@@ -299,7 +301,8 @@ try:
                     continue
 
                 gall_nums += gall_nums_part
-                if end_gall_num >= min(gall_nums):
+                collected_old_cnt = sum(1 for gall_num in gall_nums if gall_num <= end_gall_num)
+                if collected_old_cnt >= board_stop_match_cnt:
                     break
 
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
@@ -344,7 +347,19 @@ try:
                         snippet = html_snippet(html)
                         if snippet and '정상적인 접근이 아닙니다' in snippet:
                             abnormal_access += 1
-                        log(f'post parse failed gall_num={gall_num} status={status_code} html_snippet={snippet}')
+                        log(f'post parse failed gall_num={gall_num} status={status_code} html_prefix={str(html[:200])}')
+
+                        history_doc = {
+                            'gall_num': comment_doc['gall_num'],
+                            'crawl_time': comment_doc['crawl_time'],
+                            'total_cnt': comment_doc['total_cnt'],
+                            'comments': comment_doc['comments'],
+                        }
+                        db['comment_history'].update_one(
+                            {'gall_num': history_doc['gall_num'], 'crawl_time': history_doc['crawl_time']},
+                            {'$setOnInsert': history_doc},
+                            upsert=True,
+                        )
 
                 time.sleep(2)
             else:

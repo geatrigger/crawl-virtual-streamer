@@ -33,6 +33,8 @@ services:
   crawler:
     build: ./crawler
     container_name: crawler
+    environment:
+      - BOARD_STOP_MATCH_COUNT=80
     volumes:
       # - C:\crawl-virtual-streamer\crawler:/script
       - ./crawler:/script
