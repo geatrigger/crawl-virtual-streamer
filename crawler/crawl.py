@@ -24,7 +24,6 @@ s.mount('http://', HTTPAdapter(max_retries=retries))
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0',
-    'X-Requested-With': 'XMLHttpRequest',
 }
 
 
@@ -32,7 +31,7 @@ def crawl(base_url, params, how):
     if how == 'get':
         res = s.get(base_url, headers=headers, params=params, timeout=15)
     elif how == 'post':
-        res = s.post(base_url, headers=headers, params=params, timeout=15)
+        res = s.post(base_url, headers=headers, data=params, timeout=15)
     else:
         raise ValueError('how must be get or post')
 
