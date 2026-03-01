@@ -296,6 +296,9 @@ try:
 
         gall_nums = sorted(list(set(gall_nums)), reverse=True)
 
+        processed_posts = 0
+        processed_comments = 0
+
         for gall_num in gall_nums:
             if gall_num <= end_gall_num:
                 continue
@@ -309,12 +312,12 @@ try:
                 post_doc = parse_post(html, crawl_time)
                 if post_doc:
                     db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
-                    log(f"upsert post gall_num={post_doc['gall_num']}")
+                    processed_posts += 1
 
                     comment_doc, _, _ = fetch_comments(gall_num)
                     if comment_doc is not None:
                         db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
-                        log(f"upsert comments gall_num={comment_doc['gall_num']} total_cnt={comment_doc['total_cnt']}")
+                        processed_comments += 1
 
                 time.sleep(2)
             else:
@@ -324,6 +327,11 @@ try:
                     f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
                     f.write('not 200 at gall_num: ' + str(gall_num) + '\n')
                     f.write('not 200 at status_code: ' + str(status_code) + '\n')
+
+        log(
+            f'crawl cycle summary board_cnt={board_cnt}, candidate={len(gall_nums)}, '
+            f'posts_upserted={processed_posts}, comments_upserted={processed_comments}, end_gall_num={end_gall_num}'
+        )
 
         end_gall_num = max([int(ith_post['gall_num']) for ith_post in db['post'].find({}, {'_id': 0, 'gall_num': 1})])
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
