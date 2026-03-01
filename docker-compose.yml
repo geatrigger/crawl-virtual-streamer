@@ -14,8 +14,7 @@ services:
     networks:
       - mysql-crawler
   mongo:
-    # image: "mongo"
-    image: "webhippie/mongodb:latest-arm32v7"
+    image: "arm64v8/mongo:6"
     container_name: mongo
     ports:
       - "27017:27017"
