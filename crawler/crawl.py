@@ -11,7 +11,7 @@ import re
 from datetime import datetime
 
 re_text = re.compile('[^가-힣a-zA-Z0-9.]')
-re_manager = re.compile('[(](\S+)[)]')
+re_manager = re.compile(r'[(](\S+)[)]')
 
 s = requests.Session()
 retries = Retry(
@@ -26,12 +26,20 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0',
 }
 
+comment_headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36',
+    'X-Requested-With': 'XMLHttpRequest',
+}
 
-def crawl(base_url, params, how):
+
+
+def crawl(base_url, params, how, request_headers=None):
+    req_headers = request_headers or headers
+
     if how == 'get':
-        res = s.get(base_url, headers=headers, params=params, timeout=15)
+        res = s.get(base_url, headers=req_headers, params=params, timeout=15)
     elif how == 'post':
-        res = s.post(base_url, headers=headers, data=params, timeout=15)
+        res = s.post(base_url, headers=req_headers, data=params, timeout=15)
     else:
         raise ValueError('how must be get or post')
 
@@ -61,6 +69,7 @@ def parse_post(html, crawl_time):
     up_fix_cnt = soup.select_one('#recommend_view_up_fix_' + gall_num['value'])
     down_cnt = soup.select_one('#recommend_view_down_' + gall_num['value'])
     head_text = soup.select_one('span.title_headtext')
+    e_s_n_o = soup.select_one('#e_s_n_o')
 
     return {
         'crawl_time': crawl_time,
@@ -79,6 +88,7 @@ def parse_post(html, crawl_time):
         'up_fix_cnt': up_fix_cnt.get_text(strip=True) if up_fix_cnt else None,
         'down_cnt': down_cnt.get_text(strip=True) if down_cnt else None,
         'head_text': re_text.sub('', head_text.get_text()) if head_text else None,
+        'e_s_n_o': e_s_n_o.get('value') if e_s_n_o else None,
     }
 
 
@@ -146,17 +156,17 @@ def parse_board(html, crawl_time, board_cnt):
     }
 
 
-def fetch_comments(gall_num, e_s_n_o='3eabc219ebdd65f4'):
+def fetch_comments(gall_num, e_s_n_o=None):
     params = {
         'id': 'virtual_streamer',
         'no': gall_num,
         'cmt_id': 'virtual_streamer',
         'cmt_no': gall_num,
-        'e_s_n_o': e_s_n_o,
+        'e_s_n_o': e_s_n_o or '',
         'comment_page': 1,
         '_GALLTYPE_': 'MI',
     }
-    body, crawl_time, status_code = crawl('https://gall.dcinside.com/board/comment/', params, 'post')
+    body, crawl_time, status_code = crawl('https://gall.dcinside.com/board/comment/', params, 'post', request_headers=comment_headers)
     if not body:
         return None, crawl_time, status_code
 
@@ -307,7 +317,6 @@ try:
         skipped_by_end = 0
         parse_post_failed = 0
         view_non_200 = 0
-
         abnormal_access = 0
 
         for gall_num in gall_nums:
@@ -326,7 +335,7 @@ try:
                     db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
                     processed_posts += 1
 
-                    comment_doc, _, comment_status = fetch_comments(gall_num)
+                    comment_doc, _, comment_status = fetch_comments(gall_num, post_doc.get('e_s_n_o'))
                     if comment_doc is not None:
                         db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
                         processed_comments += 1
@@ -335,7 +344,6 @@ try:
                 else:
                     parse_post_failed += 1
                     if parse_post_failed <= 3:
-
                         snippet = html_snippet(html)
                         if snippet and '정상적인 접근이 아닙니다' in snippet:
                             abnormal_access += 1
