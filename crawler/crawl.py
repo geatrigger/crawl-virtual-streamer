@@ -24,7 +24,6 @@ s.mount('http://', HTTPAdapter(max_retries=retries))
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0',
-    'X-Requested-With': 'XMLHttpRequest',
 }
 
 
@@ -32,7 +31,7 @@ def crawl(base_url, params, how):
     if how == 'get':
         res = s.get(base_url, headers=headers, params=params, timeout=15)
     elif how == 'post':
-        res = s.post(base_url, headers=headers, params=params, timeout=15)
+        res = s.post(base_url, headers=headers, data=params, timeout=15)
     else:
         raise ValueError('how must be get or post')
 
@@ -240,6 +239,17 @@ if os.path.exists('./crawl_info.txt'):
 def log(msg):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
 
+
+def html_snippet(html, limit=200):
+    if html is None:
+        return None
+    try:
+        text = html.decode('utf-8') if isinstance(html, (bytes, bytearray)) else str(html)
+    except UnicodeDecodeError:
+        text = html.decode('utf-8', errors='replace') if isinstance(html, (bytes, bytearray)) else str(html)
+    text = ' '.join(text.split())
+    return text[:limit]
+
 try:
     log(f'start crawler board_cnt={board_cnt}, end_gall_num={end_gall_num}')
     board_gall_nums = []
@@ -298,6 +308,8 @@ try:
         parse_post_failed = 0
         view_non_200 = 0
 
+        abnormal_access = 0
+
         for gall_num in gall_nums:
             if gall_num <= end_gall_num:
                 skipped_by_end += 1
@@ -323,6 +335,10 @@ try:
                 else:
                     parse_post_failed += 1
                     if parse_post_failed <= 3:
+
+                        snippet = html_snippet(html)
+                        if snippet and '정상적인 접근이 아닙니다' in snippet:
+                            abnormal_access += 1
                         log(f'post parse failed gall_num={gall_num} status={status_code} html_prefix={str(html[:200])}')
 
                         history_doc = {
@@ -349,7 +365,7 @@ try:
 
         log(
             f'cycle summary board_cnt={board_cnt} candidates={len(gall_nums)} skipped_by_end={skipped_by_end} '
-            f'view_non_200={view_non_200} parse_post_failed={parse_post_failed} posts_upserted={processed_posts} comments_upserted={processed_comments}'
+            f'view_non_200={view_non_200} parse_post_failed={parse_post_failed} abnormal_access={abnormal_access} posts_upserted={processed_posts} comments_upserted={processed_comments}'
         )
 
         end_gall_num = max([int(ith_post['gall_num']) for ith_post in db['post'].find({}, {'_id': 0, 'gall_num': 1})])
