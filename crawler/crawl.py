@@ -8,6 +8,7 @@ import os
 import json
 import csv
 import re
+import traceback
 from datetime import datetime
 
 re_text = re.compile('[^가-힣a-zA-Z0-9.]')
@@ -249,8 +250,38 @@ if os.path.exists('./crawl_info.txt'):
         end_gall_num = int(f.readline())
 
 
-def log(msg):
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_LEVEL_PRIORITY = {
+    'DEBUG': 10,
+    'INFO': 20,
+    'WARN': 30,
+    'ERROR': 40,
+}
+
+
+def should_log(level):
+    configured = LOG_LEVEL_PRIORITY.get(LOG_LEVEL, LOG_LEVEL_PRIORITY['INFO'])
+    current = LOG_LEVEL_PRIORITY.get(level, LOG_LEVEL_PRIORITY['INFO'])
+    return current >= configured
+
+
+def log(msg, level='INFO'):
+    upper_level = level.upper()
+    if not should_log(upper_level):
+        return
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [{upper_level}] {msg}", flush=True)
+
+
+def log_debug(msg):
+    log(msg, 'DEBUG')
+
+
+def log_warn(msg):
+    log(msg, 'WARN')
+
+
+def log_error(msg):
+    log(msg, 'ERROR')
 
 
 def html_snippet(html, limit=200):
@@ -264,7 +295,12 @@ def html_snippet(html, limit=200):
     return text[:limit]
 
 try:
-    log(f'start crawler board_cnt={board_cnt}, end_gall_num={end_gall_num}')
+    log(
+        f'start crawler board_cnt={board_cnt}, end_gall_num={end_gall_num}, '
+        f'log_level={LOG_LEVEL}, board_stop_match_cnt={board_stop_match_cnt}, '
+        f'post_retry_count={post_retry_count}, comment_retry_count={comment_retry_count}, '
+        f'retry_sleep_seconds={retry_sleep_seconds}'
+    )
     board_gall_nums = []
     board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in db['board'].find({'board_cnt': board_cnt})]
     for ith_gall_nums in board_gall_nums_arr:
@@ -290,9 +326,16 @@ try:
                 if html:
                     board_doc = parse_board(html, crawl_time, board_cnt)
                     if not board_doc:
+                        log_debug(f'board page parse returned empty board_cnt={board_cnt} page={i}')
                         break
                     db['board'].insert_one(board_doc)
                     gall_nums_part = board_doc['gall_nums']
+                    log_debug(
+                        f'board page collected board_cnt={board_cnt} page={i} '
+                        f'gall_nums_count={len(gall_nums_part)} '
+                        f'min={min(gall_nums_part) if gall_nums_part else None} '
+                        f'max={max(gall_nums_part) if gall_nums_part else None}'
+                    )
                     time.sleep(2)
                 else:
                     with open('./boarderror.txt', 'a', encoding='utf-8') as f:
@@ -301,11 +344,16 @@ try:
                         f.write('not 200 at board_cnt: ' + str(board_cnt) + '\n')
                         f.write('not 200 at end_gall_num: ' + str(end_gall_num) + '\n')
                         f.write('not 200 at ith page: ' + str(i) + '\n')
+                    log_warn(f'board fetch non-200 board_cnt={board_cnt} page={i} status={status_code}')
                     continue
 
                 gall_nums += gall_nums_part
                 collected_old_cnt = sum(1 for gall_num in gall_nums if gall_num <= end_gall_num)
                 if collected_old_cnt >= board_stop_match_cnt:
+                    log_debug(
+                        f'stop board snapshot due to old match board_cnt={board_cnt} page={i} '
+                        f'collected_old_cnt={collected_old_cnt}'
+                    )
                     break
 
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
@@ -345,11 +393,21 @@ try:
                 html, crawl_time, status_code = crawl(view_url, params, 'get')
                 last_html = html
                 last_status_code = status_code
+                if not html:
+                    log_debug(
+                        f'post fetch failed gall_num={gall_num} attempt={post_attempt}/{post_retry_count} '
+                        f'status={status_code}'
+                    )
 
                 if html:
                     post_doc = parse_post(html, crawl_time)
                     if post_doc:
+                        log_debug(f'post parsed gall_num={gall_num} attempt={post_attempt}/{post_retry_count}')
                         break
+                    log_debug(
+                        f'post parse returned None gall_num={gall_num} attempt={post_attempt}/{post_retry_count} '
+                        f'status={status_code}'
+                    )
                 if post_attempt < post_retry_count:
                     time.sleep(retry_sleep_seconds)
 
@@ -362,7 +420,15 @@ try:
                 for comment_attempt in range(1, comment_retry_count + 1):
                     comment_doc, _, comment_status = fetch_comments(gall_num, post_doc.get('e_s_n_o'))
                     if comment_doc is not None:
+                        log_debug(
+                            f'comment fetched gall_num={gall_num} attempt={comment_attempt}/{comment_retry_count} '
+                            f'total_cnt={comment_doc.get("total_cnt")}'
+                        )
                         break
+                    log_debug(
+                        f'comment fetch failed gall_num={gall_num} attempt={comment_attempt}/{comment_retry_count} '
+                        f'status={comment_status}'
+                    )
                     if comment_attempt < comment_retry_count:
                         time.sleep(retry_sleep_seconds)
 
@@ -382,7 +448,7 @@ try:
                     )
                     processed_comments += 1
                 else:
-                    log(f'comment fetch failed after retries gall_num={gall_num} retries={comment_retry_count} status={comment_status}')
+                    log_warn(f'comment fetch failed after retries gall_num={gall_num} retries={comment_retry_count} status={comment_status}')
             else:
                 if last_html is None:
                     view_non_200 += 1
@@ -398,7 +464,7 @@ try:
                         snippet = html_snippet(last_html)
                         if snippet and '정상적인 접근이 아닙니다' in snippet:
                             abnormal_access += 1
-                        log(
+                        log_warn(
                             f'post parse failed after retries gall_num={gall_num} retries={post_retry_count} '
                             f'status={last_status_code} html_prefix={snippet}'
                         )
@@ -432,8 +498,12 @@ try:
         while work_end - work_start < 120:
             work_end = time.time()
 except Exception as e:
+    stack = traceback.format_exc()
+    log_error(f'crawler crashed with exception={e}')
+    log_error(stack)
     with open('./error.txt', 'w', encoding='utf-8') as f:
         f.write('error at: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '\n')
         f.write('error name is: ' + str(e) + '\n')
         f.write('error at board_cnt: ' + str(board_cnt) + '\n')
         f.write('error at end_gall_num: ' + str(end_gall_num) + '\n')
+        f.write('traceback:\n' + stack + '\n')
