@@ -234,7 +234,12 @@ if os.path.exists('./crawl_info.txt'):
         board_cnt = int(f.readline())
         end_gall_num = int(f.readline())
 
+
+def log(msg):
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
+
 try:
+    log(f'start crawler with board_cnt={board_cnt}, end_gall_num={end_gall_num}')
     board_gall_nums = []
     board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in db['board'].find({'board_cnt': board_cnt})]
     for ith_gall_nums in board_gall_nums_arr:
@@ -248,6 +253,7 @@ try:
 
         if not gall_nums:
             board_cnt += 1
+            log(f'collect board list for board_cnt={board_cnt}')
             for i in range(1, page_cnt):
                 params = {
                     'id': 'virtual_streamer',
@@ -276,6 +282,13 @@ try:
                 if end_gall_num >= min(gall_nums):
                     break
 
+        if db['post'].estimated_document_count() == 0 and gall_nums and max(gall_nums) <= end_gall_num:
+            log(
+                'post collection is empty, but crawl_info end_gall_num blocks all known posts. '
+                'Automatically reset end_gall_num to 0 for initial bootstrap.'
+            )
+            end_gall_num = 0
+
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
             f.write(str(board_cnt) + '\n')
             f.write(str(end_gall_num) + '\n')
@@ -295,10 +308,12 @@ try:
                 post_doc = parse_post(html, crawl_time)
                 if post_doc:
                     db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
+                    log(f"upsert post gall_num={post_doc['gall_num']}")
 
                     comment_doc, _, _ = fetch_comments(gall_num)
                     if comment_doc is not None:
                         db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
+                        log(f"upsert comments gall_num={comment_doc['gall_num']} total_cnt={comment_doc['total_cnt']}")
 
                 time.sleep(2)
             else:
