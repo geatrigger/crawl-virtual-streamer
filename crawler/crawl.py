@@ -216,6 +216,7 @@ def ensure_indexes(db):
     db['post'].create_index('gall_num', unique=True)
     db['board'].create_index('board_cnt')
     db['comment'].create_index('gall_num', unique=True)
+    db['comment_history'].create_index([('gall_num', 1), ('crawl_time', 1)], unique=True)
 
 
 client = MongoClient(os.getenv('MONGO_HOST', 'mongo'), int(os.getenv('MONGO_PORT', '27017')))
@@ -299,6 +300,18 @@ try:
                     comment_doc, _, _ = fetch_comments(gall_num)
                     if comment_doc is not None:
                         db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
+
+                        history_doc = {
+                            'gall_num': comment_doc['gall_num'],
+                            'crawl_time': comment_doc['crawl_time'],
+                            'total_cnt': comment_doc['total_cnt'],
+                            'comments': comment_doc['comments'],
+                        }
+                        db['comment_history'].update_one(
+                            {'gall_num': history_doc['gall_num'], 'crawl_time': history_doc['crawl_time']},
+                            {'$setOnInsert': history_doc},
+                            upsert=True,
+                        )
 
                 time.sleep(2)
             else:
