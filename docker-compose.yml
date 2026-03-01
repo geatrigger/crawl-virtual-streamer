@@ -35,7 +35,7 @@ services:
     container_name: crawler
     volumes:
       # - C:\crawl-virtual-streamer\crawler:/script
-      - /home/pi/crawl-virtual-streamer/crawler:/script
+      - ./crawler:/script
     networks:
       - mysql-crawler
       - mongo-crawler
@@ -47,7 +47,7 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - /home/pi/crawl-virtual-streamer/analysis:/jovyan/work
+      - ./analysis:/jovyan/work
     networks:
       - mysql-crawler
       - mongo-crawler
