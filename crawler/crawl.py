@@ -338,16 +338,6 @@ try:
                     comment_doc, _, comment_status = fetch_comments(gall_num, post_doc.get('e_s_n_o'))
                     if comment_doc is not None:
                         db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
-                        processed_comments += 1
-                    else:
-                        log(f'comment parse failed gall_num={gall_num} status={comment_status}')
-                else:
-                    parse_post_failed += 1
-                    if parse_post_failed <= 3:
-                        snippet = html_snippet(html)
-                        if snippet and '정상적인 접근이 아닙니다' in snippet:
-                            abnormal_access += 1
-                        log(f'post parse failed gall_num={gall_num} status={status_code} html_prefix={str(html[:200])}')
 
                         history_doc = {
                             'gall_num': comment_doc['gall_num'],
@@ -360,6 +350,17 @@ try:
                             {'$setOnInsert': history_doc},
                             upsert=True,
                         )
+
+                        processed_comments += 1
+                    else:
+                        log(f'comment parse failed gall_num={gall_num} status={comment_status}')
+                else:
+                    parse_post_failed += 1
+                    if parse_post_failed <= 3:
+                        snippet = html_snippet(html)
+                        if snippet and '정상적인 접근이 아닙니다' in snippet:
+                            abnormal_access += 1
+                        log(f'post parse failed gall_num={gall_num} status={status_code} html_prefix={snippet}')
 
                 time.sleep(2)
             else:
@@ -376,7 +377,9 @@ try:
             f'view_non_200={view_non_200} parse_post_failed={parse_post_failed} abnormal_access={abnormal_access} posts_upserted={processed_posts} comments_upserted={processed_comments}'
         )
 
-        end_gall_num = max([int(ith_post['gall_num']) for ith_post in db['post'].find({}, {'_id': 0, 'gall_num': 1})])
+        all_post_nums = [int(ith_post['gall_num']) for ith_post in db['post'].find({}, {'_id': 0, 'gall_num': 1}) if ith_post.get('gall_num') is not None]
+        if all_post_nums:
+            end_gall_num = max(all_post_nums)
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
             f.write(str(board_cnt) + '\n')
             f.write(str(end_gall_num) + '\n')
