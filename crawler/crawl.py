@@ -176,7 +176,9 @@ def fetch_comments(gall_num, e_s_n_o=None):
     except json.JSONDecodeError:
         return None, crawl_time, status_code
 
-    comments = parsed.get('comments', [])
+    comments = parsed.get('comments')
+    if comments is None:
+        comments = []
     return {
         'crawl_time': crawl_time,
         'gall_num': str(gall_num),
