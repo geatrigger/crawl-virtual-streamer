@@ -229,6 +229,7 @@ view_url = 'https://gall.dcinside.com/mini/board/view/'
 page_cnt = 100000
 board_cnt = -1
 end_gall_num = 10000000000
+board_stop_match_cnt = int(os.getenv('BOARD_STOP_MATCH_COUNT', '5'))
 
 if os.path.exists('./crawl_info.txt'):
     with open('./crawl_info.txt', 'r', encoding='utf-8') as f:
@@ -274,7 +275,8 @@ try:
                     continue
 
                 gall_nums += gall_nums_part
-                if end_gall_num >= min(gall_nums):
+                collected_old_cnt = sum(1 for gall_num in gall_nums if gall_num <= end_gall_num)
+                if collected_old_cnt >= board_stop_match_cnt:
                     break
 
         with open('./crawl_info.txt', 'w', encoding='utf-8') as f:
