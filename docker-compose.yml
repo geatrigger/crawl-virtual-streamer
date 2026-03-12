@@ -19,7 +19,8 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/var/lib/mongodb
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
     # environment:
       # - MONGO_INITDB_DATABASE=virtual_streamer_gall
       # - MONGO_INITDB_ROOT_USERNAME=root
@@ -64,3 +65,4 @@ networks:
 volumes:
   mysql-data:
   mongo-data:
+  mongo-config:
