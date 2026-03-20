@@ -187,6 +187,144 @@ def fetch_comments(gall_num, e_s_n_o=None):
     }, crawl_time, status_code
 
 
+def upsert_comment_data(db, comment_doc):
+    db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
+
+    history_doc = {
+        'gall_num': comment_doc['gall_num'],
+        'crawl_time': comment_doc['crawl_time'],
+        'total_cnt': comment_doc['total_cnt'],
+        'comments': comment_doc['comments'],
+    }
+    db['comment_history'].update_one(
+        {'gall_num': history_doc['gall_num'], 'crawl_time': history_doc['crawl_time']},
+        {'$setOnInsert': history_doc},
+        upsert=True,
+    )
+
+
+def fetch_post_with_retry(gall_num):
+    params = {
+        'id': 'virtual_streamer',
+        'no': gall_num,
+    }
+    post_doc = None
+    last_html = None
+    last_status_code = None
+    crawl_time = None
+
+    for post_attempt in range(1, post_retry_count + 1):
+        html, crawl_time, status_code = crawl(view_url, params, 'get')
+        last_html = html
+        last_status_code = status_code
+        if not html:
+            log_debug(
+                f'post fetch failed gall_num={gall_num} attempt={post_attempt}/{post_retry_count} '
+                f'status={status_code}'
+            )
+
+        if html:
+            post_doc = parse_post(html, crawl_time)
+            if post_doc:
+                log_debug(f'post parsed gall_num={gall_num} attempt={post_attempt}/{post_retry_count}')
+                break
+            log_debug(
+                f'post parse returned None gall_num={gall_num} attempt={post_attempt}/{post_retry_count} '
+                f'status={status_code}'
+            )
+        if post_attempt < post_retry_count:
+            time.sleep(retry_sleep_seconds)
+
+    return post_doc, last_html, last_status_code, crawl_time
+
+
+def collect_recent_comment_history(db, recent_board_count, recent_post_target):
+    if recent_board_count <= 0:
+        log_debug('skip recent comment history collection because recent_board_count <= 0')
+        return 0
+
+    board_docs = list(db['board'].find({}, {'_id': 0, 'board_cnt': 1, 'gall_nums': 1}).sort('board_cnt', -1).limit(recent_board_count))
+    if not board_docs:
+        log_warn('skip recent comment history collection because there are no board snapshots')
+        return 0
+
+    target_gall_nums = []
+    seen_gall_nums = set()
+    boards_used = 0
+    for board_doc in board_docs:
+        boards_used += 1
+        for gall_num in board_doc.get('gall_nums', []):
+            gall_num_str = str(gall_num)
+            if gall_num_str in seen_gall_nums:
+                continue
+            seen_gall_nums.add(gall_num_str)
+            target_gall_nums.append(gall_num_str)
+
+        if recent_post_target > 0 and len(target_gall_nums) >= recent_post_target:
+            break
+
+    if recent_post_target > 0:
+        target_gall_nums = target_gall_nums[:recent_post_target]
+
+    log(
+        f'recent comment history collection start boards={boards_used} '
+        f'target_posts={len(target_gall_nums)} recent_board_count={recent_board_count} '
+        f'recent_post_target={recent_post_target}'
+    )
+
+    collected_comments = 0
+    missing_posts = 0
+    failed_comments = 0
+
+    for idx, gall_num in enumerate(target_gall_nums, start=1):
+        post_doc = db['post'].find_one({'gall_num': gall_num}, {'_id': 0, 'gall_num': 1, 'e_s_n_o': 1})
+        if not post_doc or post_doc.get('e_s_n_o') is None:
+            fetched_post_doc, _, _, _ = fetch_post_with_retry(gall_num)
+            if fetched_post_doc:
+                db['post'].update_one({'gall_num': fetched_post_doc['gall_num']}, {'$set': fetched_post_doc}, upsert=True)
+                post_doc = fetched_post_doc
+            else:
+                missing_posts += 1
+                log_warn(f'recent comment history skipped gall_num={gall_num} reason=missing_post')
+                continue
+
+        comment_doc = None
+        comment_status = None
+        for comment_attempt in range(1, comment_retry_count + 1):
+            comment_doc, _, comment_status = fetch_comments(gall_num, post_doc.get('e_s_n_o'))
+            if comment_doc is not None:
+                upsert_comment_data(db, comment_doc)
+                collected_comments += 1
+                break
+            log_debug(
+                f'recent comment history fetch failed gall_num={gall_num} '
+                f'attempt={comment_attempt}/{comment_retry_count} status={comment_status}'
+            )
+            if comment_attempt < comment_retry_count:
+                time.sleep(retry_sleep_seconds)
+
+        if comment_doc is None:
+            failed_comments += 1
+            log_warn(
+                f'recent comment history fetch failed after retries gall_num={gall_num} '
+                f'retries={comment_retry_count} status={comment_status}'
+            )
+
+        time.sleep(2)
+
+        if idx % 20 == 0:
+            log(
+                f'recent comment history progress {idx}/{len(target_gall_nums)} '
+                f'collected={collected_comments} missing_posts={missing_posts} failed_comments={failed_comments}'
+            )
+
+    log(
+        f'recent comment history collection done target_posts={len(target_gall_nums)} '
+        f'collected={collected_comments} missing_posts={missing_posts} failed_comments={failed_comments}'
+    )
+    return collected_comments
+
+
 def export_monthly_posts(db, export_dir):
     now = datetime.now()
     target_year = now.year
@@ -245,6 +383,9 @@ board_stop_match_cnt = int(os.getenv('BOARD_STOP_MATCH_COUNT', '5'))
 post_retry_count = int(os.getenv('POST_RETRY_COUNT', '3'))
 comment_retry_count = int(os.getenv('COMMENT_RETRY_COUNT', '3'))
 retry_sleep_seconds = float(os.getenv('RETRY_SLEEP_SECONDS', '1'))
+recent_comment_history_interval_seconds = int(os.getenv('RECENT_COMMENT_HISTORY_INTERVAL_SECONDS', '600'))
+recent_comment_history_board_count = int(os.getenv('RECENT_COMMENT_HISTORY_BOARD_COUNT', '5'))
+recent_comment_history_post_target = int(os.getenv('RECENT_COMMENT_HISTORY_POST_TARGET', '100'))
 
 if os.path.exists('./crawl_info.txt'):
     with open('./crawl_info.txt', 'r', encoding='utf-8') as f:
@@ -301,7 +442,10 @@ try:
         f'start crawler board_cnt={board_cnt}, end_gall_num={end_gall_num}, '
         f'log_level={LOG_LEVEL}, board_stop_match_cnt={board_stop_match_cnt}, '
         f'post_retry_count={post_retry_count}, comment_retry_count={comment_retry_count}, '
-        f'retry_sleep_seconds={retry_sleep_seconds}'
+        f'retry_sleep_seconds={retry_sleep_seconds}, '
+        f'recent_comment_history_interval_seconds={recent_comment_history_interval_seconds}, '
+        f'recent_comment_history_board_count={recent_comment_history_board_count}, '
+        f'recent_comment_history_post_target={recent_comment_history_post_target}'
     )
     board_gall_nums = []
     board_gall_nums_arr = [ith_board['gall_nums'] for ith_board in db['board'].find({'board_cnt': board_cnt})]
@@ -310,6 +454,7 @@ try:
 
     post_gall_nums = list(map(int, db['post'].distinct('gall_num')))
     gall_nums = [gall_num for gall_num in (set(board_gall_nums) - set(post_gall_nums)) if gall_num > end_gall_num]
+    last_recent_comment_history_at = 0
 
     while True:
         work_start = time.time()
@@ -380,38 +525,7 @@ try:
             if gall_num <= end_gall_num:
                 skipped_by_end += 1
                 continue
-
-
-            params = {
-                'id': 'virtual_streamer',
-                'no': gall_num,
-            }
-
-            post_doc = None
-            last_html = None
-            last_status_code = None
-
-            for post_attempt in range(1, post_retry_count + 1):
-                html, crawl_time, status_code = crawl(view_url, params, 'get')
-                last_html = html
-                last_status_code = status_code
-                if not html:
-                    log_debug(
-                        f'post fetch failed gall_num={gall_num} attempt={post_attempt}/{post_retry_count} '
-                        f'status={status_code}'
-                    )
-
-                if html:
-                    post_doc = parse_post(html, crawl_time)
-                    if post_doc:
-                        log_debug(f'post parsed gall_num={gall_num} attempt={post_attempt}/{post_retry_count}')
-                        break
-                    log_debug(
-                        f'post parse returned None gall_num={gall_num} attempt={post_attempt}/{post_retry_count} '
-                        f'status={status_code}'
-                    )
-                if post_attempt < post_retry_count:
-                    time.sleep(retry_sleep_seconds)
+            post_doc, last_html, last_status_code, _ = fetch_post_with_retry(gall_num)
 
             if post_doc:
                 db['post'].update_one({'gall_num': post_doc['gall_num']}, {'$set': post_doc}, upsert=True)
@@ -435,19 +549,7 @@ try:
                         time.sleep(retry_sleep_seconds)
 
                 if comment_doc is not None:
-                    db['comment'].update_one({'gall_num': comment_doc['gall_num']}, {'$set': comment_doc}, upsert=True)
-
-                    history_doc = {
-                        'gall_num': comment_doc['gall_num'],
-                        'crawl_time': comment_doc['crawl_time'],
-                        'total_cnt': comment_doc['total_cnt'],
-                        'comments': comment_doc['comments'],
-                    }
-                    db['comment_history'].update_one(
-                        {'gall_num': history_doc['gall_num'], 'crawl_time': history_doc['crawl_time']},
-                        {'$setOnInsert': history_doc},
-                        upsert=True,
-                    )
+                    upsert_comment_data(db, comment_doc)
                     processed_comments += 1
                 else:
                     log_warn(f'comment fetch failed after retries gall_num={gall_num} retries={comment_retry_count} status={comment_status}')
@@ -494,6 +596,15 @@ try:
             f.write(str(end_gall_num) + '\n')
 
         export_monthly_posts(db, './backups')
+
+        now_ts = time.time()
+        if recent_comment_history_interval_seconds > 0 and now_ts - last_recent_comment_history_at >= recent_comment_history_interval_seconds:
+            collect_recent_comment_history(
+                db,
+                recent_comment_history_board_count,
+                recent_comment_history_post_target,
+            )
+            last_recent_comment_history_at = now_ts
 
         gall_nums = []
         work_end = time.time()
