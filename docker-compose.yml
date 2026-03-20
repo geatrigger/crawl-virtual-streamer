@@ -36,6 +36,9 @@ services:
     container_name: crawler
     environment:
       - BOARD_STOP_MATCH_COUNT=80
+      - RECENT_COMMENT_HISTORY_INTERVAL_SECONDS=600
+      - RECENT_COMMENT_HISTORY_BOARD_COUNT=5
+      - RECENT_COMMENT_HISTORY_POST_TARGET=100
     volumes:
       # - C:\crawl-virtual-streamer\crawler:/script
       - ./crawler:/script
