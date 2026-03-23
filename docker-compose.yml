@@ -14,13 +14,13 @@ services:
     networks:
       - mysql-crawler
   mongo:
-    # image: "mongo"
-    image: "webhippie/mongodb:latest-arm32v7"
+    image: "arm64v8/mongo:6"
     container_name: mongo
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/var/lib/mongodb
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
     # environment:
       # - MONGO_INITDB_DATABASE=virtual_streamer_gall
       # - MONGO_INITDB_ROOT_USERNAME=root
@@ -34,9 +34,14 @@ services:
   crawler:
     build: ./crawler
     container_name: crawler
+    environment:
+      - BOARD_STOP_MATCH_COUNT=80
+      - RECENT_COMMENT_HISTORY_INTERVAL_SECONDS=600
+      - RECENT_COMMENT_HISTORY_BOARD_COUNT=5
+      - RECENT_COMMENT_HISTORY_POST_TARGET=100
     volumes:
       # - C:\crawl-virtual-streamer\crawler:/script
-      - /home/pi/crawl-virtual-streamer/crawler:/script
+      - ./crawler:/script
     networks:
       - mysql-crawler
       - mongo-crawler
@@ -48,7 +53,7 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - /home/pi/crawl-virtual-streamer/analysis:/jovyan/work
+      - ./analysis:/jovyan/work
     networks:
       - mysql-crawler
       - mongo-crawler
@@ -62,4 +67,5 @@ networks:
 
 volumes:
   mysql-data:
-  mongo-data:
+  mongo_data:
+  mongo_config:
